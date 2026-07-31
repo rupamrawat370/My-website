@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Doubt Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">DoubtPortal</div>
+            <div class="nav-menu">
+                <button class="nav-link" id="homeBtn">Home</button>
+                <button class="nav-link" id="loginBtn">Login</button>
+                <button class="nav-link" id="dashboardBtn" style="display: none;">Dashboard</button>
+                <button class="nav-link" id="logoutBtn" style="display: none;">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+
+        <!-- Home Page -->
+        <section class="view" id="homeView">
+            <div class="hero">
+                <h1>Get Your Doubts Solved</h1>
+                <p>A simple platform for students to ask doubts and get answers from teachers.</p>
+                <div class="hero-buttons">
+                    <button class="btn btn-primary" onclick="showView('authView')">I am a Student</button>
+                    <button class="btn btn-secondary" onclick="showView('authView')">I am a Teacher</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Auth View -->
+        <section class="view" id="authView" style="display: none;">
+            <div class="auth-card">
+                <div class="auth-tabs">
+                    <button class="tab-btn active" id="loginTab">Login</button>
+                    <button class="tab-btn" id="signupTab">Student Signup</button>
+                </div>
+
+                <div class="alert" id="alert" style="display: none;"></div>
+
+                <form id="loginForm">
+                    <h3>Login</h3>
+                    <input type="email" placeholder="Email" id="loginEmail" required>
+                    <input type="password" placeholder="Password" id="loginPassword" required>
+                    <button type="submit" class="btn btn-primary w-100">Login</button>
+                </form>
+
+                <form id="signupForm" style="display: none;">
+                    <h3>Student Signup</h3>
+                    <input type="text" placeholder="Full Name" id="signupName" required>
+                    <input type="email" placeholder="Email" id="signupEmail" required>
+                    <input type="password" placeholder="Password" minlength="6" id="signupPassword" required>
+                    <button type="submit" class="btn btn-primary w-100">Create Account</button>
+                </form>
+
+            </div>
+        </section>
+
+        <!-- Student Dashboard -->
+        <section class="view" id="studentDashboard" style="display: none;">
+            <h2>Student Dashboard</h2>
+            
+            <div class="card">
+                <h3>Post New Doubt</h3>
+                <form id="doubtForm">
+                    <textarea placeholder="Describe your doubt in detail..." id="doubtText" required rows="4"></textarea>
+                    <input type="file" id="doubtImage" accept="image/*">
+                    <img id="imagePreview" style="display: none; max-width: 200px; margin: 10px 0; border-radius: 8px;">
+                    <button type="submit" class="btn btn-primary">Submit Doubt</button>
+                </form>
+            </div>
+
+            <h3>My Doubts</h3>
+            <div id="myDoubts" class="doubts-grid">
+
+            </div>
+        </section>
+
+        <!-- Teacher Dashboard -->
+        <section class="view" id="teacherDashboard" style="display: none;">
+            <h2>Teacher Dashboard</h2>
+
+            <div class="filter-tabs">
+                <button class="tab-btn active" data-filter="pending">Pending Doubts</button>
+                <button class="tab-btn" data-filter="answered">Answered Doubts</button>
+                <button class="tab-btn" data-filter="all">All Doubts</button>
+            </div>
+
+            <div id="allDoubts" class="doubts-grid">
+
+            </div>
+        </section>
+
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

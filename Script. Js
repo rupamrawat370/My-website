@@ -1,0 +1,261 @@
+// **************** PASTE YOUR FIREBASE CONFIG HERE ****************
+const firebaseConfig = {
+  // Replace this entire object with your own Firebase config
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+// *******************************************************************
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+let currentUser = null;
+let userRole = null;
+
+// Auth State Observer
+auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    userRole = null;
+
+    if(user) {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        userRole = userDoc.data().role;
+        updateNav();
+        
+        if(userRole === 'teacher') {
+            showView('teacherDashboard');
+            loadTeacherDoubts();
+        } else {
+            showView('studentDashboard');
+            loadStudentDoubts();
+        }
+
+    } else {
+        updateNav();
+        showView('homeView');
+    }
+});
+
+// View Management
+function showView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.getElementById(viewId).style.display = 'block';
+    hideAlert();
+}
+
+function updateNav() {
+    if(currentUser) {
+        document.getElementById('loginBtn').style.display = 'none';
+        document.getElementById('dashboardBtn').style.display = 'inline-block';
+        document.getElementById('logoutBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('loginBtn').style.display = 'inline-block';
+        document.getElementById('dashboardBtn').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = 'none';
+    }
+}
+
+// Alert Functions
+function showAlert(message, type='error') {
+    const alert = document.getElementById('alert');
+    alert.textContent = message;
+    alert.className = `alert ${type}`;
+    alert.style.display = 'block';
+    setTimeout(hideAlert, 5000);
+}
+
+function hideAlert() {
+    document.getElementById('alert').style.display = 'none';
+}
+
+// Auth Tabs
+document.getElementById('loginTab').addEventListener('click', () => {
+    do$cument.getElementById('loginTab').classList.add('active');
+    document.getElementById('signupTab').classList.remove('active');
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('signupForm').style.display = 'none';
+});
+
+document.getElementById('signupTab').addEventListener('click', () => {
+    document.getElementById('signupTab').classList.add('active');
+    document.getElementById('loginTab').classList.remove('active');
+    document.getElementById('signupForm').style.display = 'block';
+    document.getElementById('loginForm').style.display = 'none';
+});
+
+// Login
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await auth.signInWithEmailAndPassword(
+            document.getElementById('loginEmail').value,
+            document.getElementById('loginPassword').value
+        );
+    } catch (error) {
+        showAlert(error.message);
+    }
+});
+
+// Signup
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        const {user} = await auth.createUserWithEmailAndPassword(
+            document.getElementById('signupEmail').value,
+            document.getElementById('signupPassword').value
+        );
+
+        await db.collection('users').doc(user.uid).set({
+            name: document.getElementById('signupName').value,
+            email: user.email,
+            role: 'student',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+    } catch (error) {
+        showAlert(error.message);
+    }
+});
+
+// Logout
+document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
+
+// Navigation
+document.getElementById('homeBtn').addEventListener('click', () => showView('homeView'));
+document.getElementById('loginBtn').addEventListener('click', () => showView('authView'));
+document.getElementById('dashboardBtn').addEventListener('click', () => {
+    userRole === 'teacher' ? showView('teacherDashboard') : showView('studentDashboard');
+});
+
+// Post New Doubt
+document.getElementById('doubtForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const text = document.getElementById('doubtText').value;
+    const imageFile = document.getElementById('doubtImage').files[0];
+    let imageUrl = null;
+
+    try {
+        if(imageFile) {
+            const ref = storage.ref(`doubts/\({Date.now()}_\){imageFile.name}`);
+            await ref.put(imageFile);
+            imageUrl = await ref.getDownloadURL();
+        }
+
+        await db.collection('doubts').add({
+            text,
+            imageUrl,
+            studentId: currentUser.uid,
+            studentName: (await db.collection('users').doc(currentUser.uid).get()).data().name,
+            status: 'pending',
+            answer: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        document.getElementById('doubtForm').reset();
+        document.getElementById('imagePreview').style.display = 'none';
+        showAlert('Doubt posted successfully!', 'success');
+
+    } catch (error) {
+        showAlert(error.message);
+    }
+});
+
+// Image Preview
+document.getElementById('doubtImage').addEventListener('change', (e) => {
+    if(e.target.files[0]) {
+        const preview = document.getElementById('imagePreview');
+        preview.src = URL.createObjectURL(e.target.files[0]);
+        preview.style.display = 'block';
+    }
+});
+
+// Load Student Doubts Realtime
+function loadStudentDoubts() {
+    db.collection('doubts').where('studentId', '==', currentUser.uid).orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        const container = document.getElementById('myDoubts');
+        container.innerHTML = '';
+        snapshot.forEach(doc => container.innerHTML += renderDoubtCard(doc.data(), doc.id));
+    })
+}
+
+// Load Teacher Doubts Realtime
+function loadTeacherDoubts() {
+    db.collection('doubts').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        window.allDoubts = snapshot.docs;
+        renderFilteredDoubts('pending');
+    })
+}
+
+// Filter Doubts
+document.querySelectorAll('.filter-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.filter-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        renderFilteredDoubts(e.target.dataset.filter);
+    })
+})
+
+function renderFilteredDoubts(filter) {
+    const container = document.getElementById('allDoubts');
+    container.innerHTML = '';
+
+    window.allDoubts.forEach(doc => {
+        const data = doc.data();
+        if(filter === 'all' || data.status === filter) {
+            container.innerHTML += renderDoubtCard(data, doc.id, true);
+        }
+    })
+}
+
+// Render Doubt Card
+function renderDoubtCard(doubt, id, isTeacher = false) {
+    return `
+    <div class="doubt-card \({doubt.status}">
+        <div class="doubt-meta">
+            <div>Posted by: \){doubt.studentName}</div>
+            <div>Status: \({doubt.status}</div>
+        </div>
+        <div class="doubt-text">\){doubt.text}</div>
+        ${doubt.imageUrl ? `<img src="\({doubt.imageUrl}" class="doubt-image" alt="Doubt attachment">` : ''}
+
+        \){doubt.answer ? `
+        <div class="answer">
+            <h4>Answer:</h4>
+            <p>${doubt.answer}</p>
+        </div>
+        ` : ''}
+
+        \({isTeacher && doubt.status === 'pending' ? `
+        <div style="margin-top: 1rem;">
+            <textarea placeholder="Write your answer here..." rows="3" id="answer-\){id}"></textarea>
+            <button class="btn btn-primary w-100" onclick="submitAnswer('\({id}')">Submit Answer</button>
+        </div>
+        ` : ''}
+    </div>
+    `
+}
+
+// Submit Answer
+async function submitAnswer(doubtId) {
+    const answer = document.getElementById(`answer-\){doubtId}`).value;
+    if(!answer) return;
+
+    try {
+        await db.collection('doubts').doc(doubtId).update({
+            answer: answer,
+            status: 'answered',
+            answeredAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showAlert('Answer submitted successfully', 'success');
+    } catch (error) {
+        showAlert(error.message);
+    }
+}
